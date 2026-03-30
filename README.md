@@ -6,7 +6,6 @@ Ansible role for deploying and managing [Kasm Workspaces](https://www.kasmweb.co
 
 - Ansible 2.10 or greater on the control node
 - Target hosts: Debian/Ubuntu (tested on Debian 13)
-- Target hosts must have passwordless sudo configured for the Ansible SSH user
 
 ## Role structure
 
