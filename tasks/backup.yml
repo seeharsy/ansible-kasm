@@ -1,0 +1,30 @@
+---
+# Backup the Kasm PostgreSQL database.
+# Only runs on hosts that include 'db' in kasm_services.
+
+- name: Skip hosts without db service
+  ansible.builtin.meta: end_host
+  when: "'db' not in kasm_services"
+
+- name: Ensure backup directory exists
+  ansible.builtin.file:
+    path: "{{ remote_backup_dir }}"
+    state: directory
+    mode: "0750"
+  become: true
+
+- name: Run database backup script
+  ansible.builtin.script: "backup.sh {{ remote_backup_dir }} {{ retention_days }}"
+  register: backup_output
+  become: true
+
+- name: Set remote backup file path from script output
+  ansible.builtin.set_fact:
+    remote_backup: "{{ backup_output.stdout_lines[-1] }}"
+
+- name: Fetch backup to Ansible control node
+  ansible.builtin.fetch:
+    src: "{{ remote_backup }}"
+    dest: "{{ local_backup_dir }}"
+    flat: true
+  when: local_backup_dir is defined

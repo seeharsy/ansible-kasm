@@ -1,0 +1,24 @@
+---
+- name: "Install database role — this may take several minutes"
+  ansible.builtin.command: >
+    bash {{ tempdir.path }}/kasm_release/install.sh
+      --role db
+      --accept-eula
+      --proxy-port {{ proxy_port }}
+      --database-user {{ database_user }}
+      --database-name {{ database_name }}
+      --db-password {{ database_password }}
+      --user-password {{ user_password }}
+      --admin-password {{ admin_password }}
+      --manager-token {{ manager_token }}
+      --registration-token {{ registration_token }}
+      --server-zone {{ zones[0] }}
+      {{ '--no-db-ssl' if not database_ssl else '' }}
+      {{ '--offline-service ' ~ service_images_copy.dest if (service_images_file is not none and service_images_file | length > 0) else '' }}
+      {{ '--offline-workspaces ' ~ workspace_images_copy.dest if (workspace_images_file is not none and workspace_images_file | length > 0) else '' }}
+  register: install_output
+  become: true
+  changed_when: install_output.rc == 0
+  async: 2400
+  poll: 15
+  tags: install

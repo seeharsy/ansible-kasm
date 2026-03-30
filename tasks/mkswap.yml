@@ -1,0 +1,35 @@
+---
+- name: Create swap file
+  # fallocate creates sparse files which swapon rejects; dd writes real zeros
+  ansible.builtin.command: >
+    dd if=/dev/zero bs=1M count={{ (new_swap_size | int / 1024 / 1024) | int }} of=/mnt/kasm.swap
+  become: true
+  changed_when: true
+  tags: install
+
+- name: Set swapfile permissions
+  ansible.builtin.file:
+    path: /mnt/kasm.swap
+    mode: "0600"
+  become: true
+  tags: install
+
+- name: Format swap file
+  ansible.builtin.command: mkswap /mnt/kasm.swap
+  become: true
+  changed_when: true
+  tags: install
+
+- name: Add swapfile to fstab
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    line: "/mnt/kasm.swap swap swap defaults 0 0"
+    state: present
+  become: true
+  tags: install
+
+- name: Activate swap
+  ansible.builtin.command: swapon /mnt/kasm.swap
+  become: true
+  changed_when: true
+  tags: install

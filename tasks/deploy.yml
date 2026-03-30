@@ -1,0 +1,192 @@
+---
+# Full Kasm deployment — installs all services declared in kasm_services.
+# Skips components that are already running (idempotent).
+
+- name: Load and generate credentials
+  ansible.builtin.include_tasks:
+    file: default_credentials.yml
+
+- name: Check if kasm swapfile exists
+  ansible.builtin.stat:
+    path: /mnt/kasm.swap
+  register: kasm_swapfile
+  when: "'agent' in kasm_services"
+
+- name: Get current swap size in bytes
+  ansible.builtin.command: awk '/SwapTotal/ {print $2 * 1024}' /proc/meminfo
+  register: current_swap_size
+  changed_when: false
+  when: "'agent' in kasm_services"
+
+- name: Calculate additional swap required
+  ansible.builtin.set_fact:
+    new_swap_size: "{{ desired_swap_size | human_to_bytes - current_swap_size.stdout | int }}"
+  when: "'agent' in kasm_services"
+
+- name: Run swap creation tasks
+  ansible.builtin.include_tasks:
+    file: mkswap.yml
+  when:
+    - "'agent' in kasm_services"
+    - new_swap_size | int > 0
+    - not kasm_swapfile.stat.exists
+
+- name: Create temporary working directory
+  ansible.builtin.tempfile:
+    state: directory
+  register: tempdir
+
+- name: Ensure curl is installed
+  ansible.builtin.package:
+    name: curl
+    state: present
+  become: true
+
+- name: Copy activation key file to target
+  ansible.builtin.copy:
+    src: "{{ kasm_activation_key_file }}"
+    dest: "{{ tempdir.path }}/kasm_activation.key"
+    mode: "0600"
+  become: true
+  when: kasm_activation_key_file | length > 0
+
+- name: Copy installer to target
+  ansible.builtin.include_tasks:
+    file: copy_installer.yml
+  when: >
+    (kasm_all_in_one and not web_installed) or
+    (not kasm_all_in_one and (
+      ('db'    in kasm_services and not db_installed) or
+      ('web'   in kasm_services and not web_installed) or
+      ('agent' in kasm_services and not agent_installed) or
+      ('guac'  in kasm_services and not guac_installed) or
+      ('proxy' in kasm_services and not proxy_installed)
+    ))
+
+- name: Configure additional zones
+  ansible.builtin.include_tasks:
+    file: add_zones.yml
+  when: zones | length > 1
+
+- name: Run all-in-one installation
+  ansible.builtin.include_tasks:
+    file: all_install.yml
+  when:
+    - kasm_all_in_one
+    - not web_installed
+
+- name: Run database installation
+  ansible.builtin.include_tasks:
+    file: db_install.yml
+  when:
+    - not kasm_all_in_one
+    - "'db' in kasm_services"
+    - not db_installed
+
+- name: Run remote database initialisation
+  ansible.builtin.include_tasks:
+    file: remote_db_init.yml
+  when:
+    - not kasm_all_in_one
+    - init_remote_db
+    - database_hostname
+    - "'web' in kasm_services"
+    - not web_installed
+
+- name: Run web installation
+  ansible.builtin.include_tasks:
+    file: web_install.yml
+  when:
+    - not kasm_all_in_one
+    - "'web' in kasm_services"
+    - not web_installed
+
+- name: Start Kasm services
+  ansible.builtin.command: /opt/kasm/bin/start
+  become: true
+  changed_when: true
+  when: "'web' in kasm_services"
+
+- name: Wait for Kasm web API to be healthy
+  ansible.builtin.uri:
+    url: "https://{{ web_ip }}:{{ proxy_port }}/api/__healthcheck"
+    timeout: 5
+    validate_certs: false
+  register: _result
+  until: _result.status == 200
+  retries: 60
+  delay: 10
+  when: "'web' in kasm_services"
+
+- name: Run agent installation
+  ansible.builtin.include_tasks:
+    file: agent_install.yml
+  when:
+    - not kasm_all_in_one
+    - "'agent' in kasm_services"
+    - not agent_installed
+
+- name: Run Guacamole installation
+  ansible.builtin.include_tasks:
+    file: guac_install.yml
+  when:
+    - not kasm_all_in_one
+    - "'guac' in kasm_services"
+    - not guac_installed
+
+- name: Run proxy installation
+  ansible.builtin.include_tasks:
+    file: proxy_install.yml
+  when:
+    - not kasm_all_in_one
+    - "'proxy' in kasm_services"
+    - not proxy_installed
+
+- name: Enable Docker to start on boot
+  ansible.builtin.service:
+    name: docker
+    enabled: true
+  become: true
+  when: start_docker_on_boot
+
+- name: Remove temporary working directory
+  ansible.builtin.file:
+    path: "{{ tempdir.path }}"
+    state: absent
+  become: true
+
+- name: Display credentials
+  ansible.builtin.debug:
+    msg:
+      - "Database Password : {{ database_password }}"
+      - "Manager Token     : {{ manager_token }}"
+      - "Registration Token: {{ registration_token }}"
+      - "user@kasm.local   : {{ user_password }}"
+      - "admin@kasm.local  : {{ admin_password }}"
+  run_once: true
+
+- name: Write credentials back to vault file
+  ansible.builtin.copy:
+    content: |
+      ---
+      # Encrypt this file with: ansible-vault encrypt group_vars/all/vault.yml
+      vault_user_password: "{{ user_password }}"
+      vault_admin_password: "{{ admin_password }}"
+      vault_database_password: "{{ database_password }}"
+      vault_manager_token: "{{ manager_token }}"
+      vault_registration_token: "{{ registration_token }}"
+    dest: "{{ inventory_dir }}/group_vars/all/vault.yml"
+    mode: "0600"
+  run_once: true
+  delegate_to: localhost
+
+- name: Disable remote db init after successful run
+  ansible.builtin.replace:
+    dest: "{{ inventory_dir }}/group_vars/all/vars.yml"
+    regexp: "^init_remote_db: true"
+    replace: "init_remote_db: false"
+  run_once: true
+  delegate_to: localhost
+  when:
+    - init_remote_db
+    - database_hostname

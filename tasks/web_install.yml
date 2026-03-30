@@ -1,0 +1,36 @@
+---
+- name: Wait for database port to be reachable
+  ansible.builtin.wait_for:
+    port: 5432
+    host: "{{ db_ip }}"
+    delay: 10
+    timeout: 300
+  tags: install
+
+- name: "Install web role — this may take several minutes while Docker images are pulled"
+  ansible.builtin.command: >
+    bash {{ tempdir.path }}/kasm_release/install.sh
+      --role app
+      --accept-eula
+      --proxy-port {{ proxy_port }}
+      --db-hostname {{ db_ip }}
+      --db-password {{ database_password }}
+      --api-hostname {{ target_ip }}
+      --database-user {{ database_user }}
+      --database-name {{ database_name }}
+      --db-port {{ database_port }}
+      --server-zone {{ group_names | intersect(zones) | first }}
+      {{ '--no-db-ssl' if not database_ssl else '' }}
+      {{ '--offline-service ' ~ service_images_copy.dest if (service_images_file is not none and service_images_file | length > 0) else '' }}
+      {{ '--offline-workspaces ' ~ workspace_images_copy.dest if (workspace_images_file is not none and workspace_images_file | length > 0) else '' }}
+      {{ '--activation-key-file ' ~ tempdir.path ~ '/kasm_activation.key' if kasm_activation_key_file | length > 0 else '' }}
+      {{ '--enable-lossless' if kasm_enable_lossless else '' }}
+      {{ '--default-registry-url ' ~ kasm_default_registry_url if kasm_default_registry_url | length > 0 else '' }}
+      {{ '--no-check-ports' if kasm_no_check_ports else '' }}
+      {{ '--no-check-disk' if kasm_no_check_disk else '' }}
+  register: install_output
+  become: true
+  changed_when: install_output.rc == 0
+  async: 2400
+  poll: 15
+  tags: install

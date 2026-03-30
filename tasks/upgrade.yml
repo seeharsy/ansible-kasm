@@ -1,0 +1,167 @@
+---
+# Upgrade Kasm to the installer tarball present in files/.
+# Place the new kasm_release_*.tar.gz in files/ before running.
+
+- name: Locate installer tarball for upgrade
+  ansible.builtin.set_fact:
+    _upgrade_installer_glob: >-
+      {{
+        lookup('fileglob', role_path + '/files/kasm_workspaces_*.tar.gz', wantlist=True) +
+        lookup('fileglob', role_path + '/files/kasm_release_*.tar.gz', wantlist=True)
+      }}
+  when: kasm_installer_file is not defined or kasm_installer_file | length == 0
+  delegate_to: localhost
+
+- name: Resolve installer path
+  ansible.builtin.set_fact:
+    _upgrade_installer_path: >-
+      {%- if kasm_installer_file is defined and kasm_installer_file | length > 0 -%}
+        {{ kasm_installer_file }}
+      {%- elif version is defined and version | length > 0 -%}
+        {{ _upgrade_installer_glob | default([]) | select('search', version | regex_escape) | list | sort | last | default('') }}
+      {%- else -%}
+        {{ _upgrade_installer_glob | default([]) | sort | last | default('') }}
+      {%- endif -%}
+
+- name: Assert installer tarball is present
+  ansible.builtin.assert:
+    that: _upgrade_installer_path | length > 0
+    fail_msg: "No Kasm installer found in files/ and kasm_installer_file is not set."
+
+- name: Read installed Kasm version from symlink target
+  ansible.builtin.command: readlink /opt/kasm/current
+  register: kasm_current_link
+  become: true
+  failed_when: false
+  changed_when: false
+
+- name: Assert Kasm is installed before upgrading
+  ansible.builtin.assert:
+    that: kasm_current_link.rc == 0
+    fail_msg: "No Kasm installation found at /opt/kasm/current — run deploy first."
+
+- name: Set version facts
+  ansible.builtin.set_fact:
+    kasm_installed_version: "{{ kasm_current_link.stdout | basename }}"
+    kasm_target_version: "{{ _upgrade_installer_path | basename | regex_replace('^.*?(\\d+\\.\\d+\\.\\d+).*$', '\\1') }}"
+
+- name: Show installed vs target version
+  ansible.builtin.debug:
+    msg: "Installed: {{ kasm_installed_version }} — Available: {{ kasm_target_version }}"
+
+- name: Abort — installer tarball is older than installed version
+  ansible.builtin.fail:
+    msg: >
+      Downgrade not supported.
+      Installed: {{ kasm_installed_version }}, Installer: {{ kasm_target_version }}.
+      Place a newer kasm_release_*.tar.gz in files/ or set kasm_installer_file.
+  when: kasm_target_version is version(kasm_installed_version, '<')
+
+- name: Skip upgrade — already at target version
+  ansible.builtin.meta: end_host
+  when: kasm_installed_version == kasm_target_version
+
+- name: Create temporary working directory
+  ansible.builtin.tempfile:
+    state: directory
+  register: tempdir
+
+- name: Ensure curl is installed
+  ansible.builtin.package:
+    name: curl
+    state: present
+  become: true
+
+- name: Copy activation key file to target
+  ansible.builtin.copy:
+    src: "{{ kasm_activation_key_file }}"
+    dest: "{{ tempdir.path }}/kasm_activation.key"
+    mode: "0600"
+  become: true
+  when: kasm_activation_key_file | length > 0
+
+- name: Copy installer for upgrade
+  ansible.builtin.include_tasks:
+    file: copy_installer.yml
+
+- name: Stop Kasm services before upgrade
+  ansible.builtin.command: /opt/kasm/bin/stop
+  become: true
+  changed_when: true
+
+- name: "Stage Kasm upgrade — pulls new images, does not start services"
+  ansible.builtin.command: >
+    bash {{ tempdir.path }}/kasm_release/install.sh
+      --role all
+      --accept-eula
+      --no-db-init
+      --no-start
+      --proxy-port {{ proxy_port }}
+      --db-password {{ database_password }}
+      --user-password {{ user_password }}
+      --admin-password {{ admin_password }}
+      --manager-token {{ manager_token }}
+      --registration-token {{ registration_token }}
+      --server-zone {{ group_names | intersect(zones) | first }}
+      {{ '--no-db-ssl' if not database_ssl else '' }}
+      {{ '--activation-key-file ' ~ tempdir.path ~ '/kasm_activation.key' if kasm_activation_key_file | length > 0 else '' }}
+      {{ '--enable-lossless' if kasm_enable_lossless else '' }}
+      {{ '--default-registry-url ' ~ kasm_default_registry_url if kasm_default_registry_url | length > 0 else '' }}
+      {{ '--no-check-ports' if kasm_no_check_ports else '' }}
+      {{ '--no-check-disk' if kasm_no_check_disk else '' }}
+  register: upgrade_output
+  become: true
+  changed_when: upgrade_output.rc == 0
+  async: 2400
+  poll: 15
+
+- name: Create new database volume for {{ kasm_target_version }}
+  ansible.builtin.command: docker volume create kasm_db_{{ kasm_target_version }}
+  become: true
+  changed_when: true
+
+- name: Migrate database volume from {{ kasm_installed_version }} to {{ kasm_target_version }}
+  ansible.builtin.command: >
+    docker run --rm
+      -v kasm_db_{{ kasm_installed_version }}:/from
+      -v kasm_db_{{ kasm_target_version }}:/to
+      alpine ash -c "cd /from && cp -av . /to"
+  become: true
+  changed_when: true
+
+- name: Update current symlink to {{ kasm_target_version }}
+  ansible.builtin.file:
+    src: /opt/kasm/{{ kasm_target_version }}
+    dest: /opt/kasm/current
+    state: link
+    force: true
+  become: true
+
+- name: Run database schema migration
+  ansible.builtin.command: >
+    /opt/kasm/{{ kasm_target_version }}/bin/utils/db_upgrade
+      --path /opt/kasm/{{ kasm_target_version }}
+  become: true
+  changed_when: true
+
+- name: Start Kasm services
+  ansible.builtin.command: /opt/kasm/bin/start
+  become: true
+  changed_when: true
+
+- name: Wait for Kasm web API to be healthy after upgrade
+  ansible.builtin.uri:
+    url: "https://{{ web_ip }}:{{ proxy_port }}/api/__healthcheck"
+    timeout: 5
+    validate_certs: false
+  register: _result
+  until: _result.status == 200
+  retries: 60
+  delay: 10
+  when: "'web' in kasm_services"
+
+- name: Remove temporary working directory
+  ansible.builtin.file:
+    path: "{{ tempdir.path }}"
+    state: absent
+  become: true

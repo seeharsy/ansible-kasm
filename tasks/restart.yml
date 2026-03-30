@@ -1,0 +1,8 @@
+---
+- name: Stop Kasm services
+  ansible.builtin.include_tasks:
+    file: stop.yml
+
+- name: Start Kasm services
+  ansible.builtin.include_tasks:
+    file: start.yml

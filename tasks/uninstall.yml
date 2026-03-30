@@ -1,0 +1,135 @@
+---
+# Remove all Kasm containers, images, volumes, networks, and /opt/kasm.
+# Remote databases are not touched — data there persists.
+
+- name: Get Kasm service container IDs
+  ansible.builtin.command: docker ps -f name=kasm_ -qa
+  register: service_containers
+  changed_when: false
+  become: true
+  ignore_errors: true
+
+- name: Remove Kasm service containers
+  ansible.builtin.command: "docker rm -f {{ item }}"
+  become: true
+  changed_when: true
+  ignore_errors: true
+  loop: "{{ service_containers.stdout_lines }}"
+
+- name: Get Kasm session container IDs
+  ansible.builtin.command: docker container ls -qa --filter=label=kasm.kasmid
+  register: session_containers
+  changed_when: false
+  become: true
+  ignore_errors: true
+
+- name: Remove Kasm session containers
+  ansible.builtin.command: "docker rm -f {{ item }}"
+  become: true
+  changed_when: true
+  ignore_errors: true
+  loop: "{{ session_containers.stdout_lines }}"
+
+- name: Get Kasm default network ID
+  ansible.builtin.command: docker network ls -q -f name=kasm_default_network
+  register: kasm_network
+  become: true
+  ignore_errors: true
+  changed_when: false
+
+- name: Remove Kasm default network
+  ansible.builtin.command: docker network rm kasm_default_network
+  ignore_errors: true
+  become: true
+  changed_when: true
+  when: kasm_network.stdout | length > 0
+
+- name: Get Kasm sidecar network ID
+  ansible.builtin.command: docker network ls -q -f name=kasm_sidecar_network
+  register: kasm_sidecar_network
+  become: true
+  ignore_errors: true
+  changed_when: false
+
+- name: Remove Kasm sidecar network
+  ansible.builtin.command: docker network rm kasm_sidecar_network
+  ignore_errors: true
+  become: true
+  changed_when: true
+  when: kasm_sidecar_network.stdout | length > 0
+
+- name: Get Kasm database volume names
+  ansible.builtin.command: docker volume ls --filter name=kasm_db_ -q
+  ignore_errors: true
+  become: true
+  register: kasm_database
+  changed_when: false
+
+- name: Remove Kasm database volumes
+  ansible.builtin.command: "docker volume rm {{ item }}"
+  ignore_errors: true
+  become: true
+  changed_when: true
+  loop: "{{ kasm_database.stdout_lines }}"
+
+- name: Get Kasm Docker image IDs
+  ansible.builtin.shell: |
+    docker images --filter "label=com.kasmweb.image=true" -q
+    docker images kasmweb/nginx -q
+    docker images kasmweb/agent -q
+    docker images kasmweb/agent-private -q
+    docker images kasmweb/manager -q
+    docker images kasmweb/manager-private -q
+    docker images kasmweb/api -q
+    docker images kasmweb/api-private -q
+    docker images kasmweb/guac -q
+    docker images kasmweb/guac-private -q
+    docker images kasmweb/kasm-guac -q
+    docker images kasmweb/kasm-guac-private -q
+    docker images kasmweb/proxy -q
+    docker images kasmweb/proxy-private -q
+    docker images postgres -q
+    docker images kasmweb/rdp-gateway -q
+    docker images kasmweb/rdp-gateway-private -q
+    docker images kasmweb/rdp-https-gateway -q
+    docker images kasmweb/rdp-https-gateway-private -q
+  register: kasm_images
+  become: true
+  ignore_errors: true
+  changed_when: false
+
+- name: Remove Kasm Docker images
+  ansible.builtin.command: "docker rmi {{ item }}"
+  become: true
+  ignore_errors: true
+  changed_when: true
+  loop: "{{ kasm_images.stdout_lines | unique }}"
+
+- name: List Docker plugins
+  ansible.builtin.command: docker plugin ls
+  become: true
+  ignore_errors: true
+  changed_when: false
+  register: plugin_list
+
+- name: Identify Kasm sidecar network plugin
+  ansible.builtin.set_fact:
+    sidecar_plugins: "{{ plugin_list.stdout_lines | select('match', '.*Kasm Network plugin for Docker.*') | list }}"
+
+- name: Disable Kasm sidecar plugin
+  ansible.builtin.command: "docker plugin disable {{ item.split()[1] }}"
+  become: true
+  changed_when: true
+  loop: "{{ sidecar_plugins }}"
+
+- name: Remove Kasm sidecar plugin
+  ansible.builtin.command: "docker plugin rm {{ item.split()[1] }}"
+  become: true
+  changed_when: true
+  loop: "{{ sidecar_plugins }}"
+
+- name: Remove Kasm installation directory
+  ansible.builtin.file:
+    path: /opt/kasm/
+    state: absent
+  become: true

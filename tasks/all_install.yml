@@ -1,0 +1,27 @@
+---
+- name: "Install Kasm (all-in-one) — this may take 10–20 minutes while Docker images are pulled"
+  ansible.builtin.command: >
+    bash {{ tempdir.path }}/kasm_release/install.sh
+      --role all
+      --accept-eula
+      --proxy-port {{ proxy_port }}
+      --db-password {{ database_password }}
+      --user-password {{ user_password }}
+      --admin-password {{ admin_password }}
+      --manager-token {{ manager_token }}
+      --registration-token {{ registration_token }}
+      --server-zone {{ group_names | intersect(zones) | first }}
+      {{ '--no-db-ssl' if not database_ssl else '' }}
+      {{ '--offline-service ' ~ service_images_copy.dest if (service_images_file is not none and service_images_file | length > 0) else '' }}
+      {{ '--offline-workspaces ' ~ workspace_images_copy.dest if (workspace_images_file is not none and workspace_images_file | length > 0) else '' }}
+      {{ '--activation-key-file ' ~ tempdir.path ~ '/kasm_activation.key' if kasm_activation_key_file | length > 0 else '' }}
+      {{ '--enable-lossless' if kasm_enable_lossless else '' }}
+      {{ '--default-registry-url ' ~ kasm_default_registry_url if kasm_default_registry_url | length > 0 else '' }}
+      {{ '--no-check-ports' if kasm_no_check_ports else '' }}
+      {{ '--no-check-disk' if kasm_no_check_disk else '' }}
+  register: install_output
+  become: true
+  changed_when: install_output.rc == 0
+  async: 2400
+  poll: 15
+  tags: install

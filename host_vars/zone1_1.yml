@@ -1,0 +1,9 @@
+---
+kasm_services:
+  - db
+  - web
+  - agent
+  - guac
+  # - proxy
+
+kasm_zone: zone1

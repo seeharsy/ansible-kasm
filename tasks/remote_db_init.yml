@@ -1,0 +1,35 @@
+---
+- name: Wait for database port to be reachable
+  ansible.builtin.wait_for:
+    port: 5432
+    host: "{{ db_ip }}"
+    timeout: 60
+  tags: install
+
+- name: Initialise remote database
+  ansible.builtin.expect:
+    timeout: 600
+    command: >
+      bash {{ tempdir.path }}/kasm_release/install.sh
+        --role init_remote_db
+        --accept-eula
+        --proxy-port {{ proxy_port }}
+        --db-hostname {{ database_hostname }}
+        --db-password {{ database_password }}
+        --database-user {{ database_user }}
+        --database-name {{ database_name }}
+        --db-master-user {{ database_master_user }}
+        --db-master-password {{ database_master_password }}
+        --db-port {{ database_port }}
+        --server-zone {{ zones[0] }}
+        --manager-token {{ manager_token }}
+        --registration-token {{ registration_token }}
+        --user-password {{ user_password }}
+        --admin-password {{ admin_password }}
+        {{ '--no-db-ssl' if not database_ssl else '' }}
+        {{ '--offline-service ' ~ service_images_copy.dest if (service_images_file is not none and service_images_file | length > 0) else '' }}
+    responses:
+      (?i)Continue: "y"
+  run_once: true
+  become: true
+  tags: install

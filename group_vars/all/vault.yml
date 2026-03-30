@@ -1,0 +1,7 @@
+---
+# Encrypt this file with: ansible-vault encrypt group_vars/all/vault.yml
+vault_user_password: ""
+vault_admin_password: ""
+vault_database_password: ""
+vault_manager_token: ""
+vault_registration_token: ""

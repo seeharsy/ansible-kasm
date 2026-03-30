@@ -1,0 +1,22 @@
+---
+galaxy_info:
+  role_name: kasm
+  author: seeharsy
+  description: Deploy and manage Kasm Workspaces (single-server and distributed)
+  license: MIT
+  min_ansible_version: "2.10"
+  platforms:
+    - name: EL
+      versions:
+        - "8"
+        - "9"
+    - name: Ubuntu
+      versions:
+        - focal
+        - jammy
+  galaxy_tags:
+    - kasm
+    - docker
+    - remote_desktop
+
+dependencies: []

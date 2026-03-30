@@ -1,0 +1,67 @@
+---
+# Preflight: detect installed components and resolve network topology.
+# Included by deploy.yml and upgrade.yml before their respective logic runs.
+
+- name: Get installed Kasm containers
+  ansible.builtin.command: docker ps -a --format '{{ '{{' }}.Names{{ '}}' }}'
+  register: kasm_containers
+  changed_when: false
+  become: true
+  failed_when: false
+
+- name: Set component installation state facts
+  ansible.builtin.set_fact:
+    db_installed:    "{{ 'kasm_db'    in kasm_containers.stdout }}"
+    web_installed:   "{{ 'kasm_api'   in kasm_containers.stdout }}"
+    agent_installed: "{{ 'kasm_agent' in kasm_containers.stdout }}"
+    guac_installed:  "{{ 'kasm_guac'  in kasm_containers.stdout }}"
+    proxy_installed: "{{ 'kasm_proxy' in kasm_containers.stdout }}"
+
+- name: Determine if this is an all-in-one deployment
+  ansible.builtin.set_fact:
+    kasm_all_in_one: >-
+      {{
+        ('db'    in kasm_services) and
+        ('web'   in kasm_services) and
+        ('agent' in kasm_services)
+      }}
+
+- name: Set web_ip and target_ip (per-host web server)
+  ansible.builtin.set_fact:
+    web_ip:    "{{ ansible_default_ipv4.address }}"
+    target_ip: "{{ ansible_default_ipv4.address }}"
+  when: not default_web
+
+- name: Set web_ip (zone primary) and target_ip
+  ansible.builtin.set_fact:
+    web_ip: >-
+      {{
+        hostvars[
+          (groups[kasm_zone + '_web'] | default(
+            groups['zone1'] | select('match', '.*') | list
+          ))[0]
+        ].ansible_default_ipv4.address
+      }}
+    target_ip: "{{ ansible_default_ipv4.address }}"
+  when: default_web and not kasm_all_in_one
+
+- name: Set web_ip to local address for all-in-one
+  ansible.builtin.set_fact:
+    web_ip:    "{{ ansible_default_ipv4.address }}"
+    target_ip: "{{ ansible_default_ipv4.address }}"
+  when: kasm_all_in_one
+
+- name: Set db_ip from local host
+  ansible.builtin.set_fact:
+    db_ip: "{{ ansible_default_ipv4.address }}"
+  when: not database_hostname
+
+- name: Set db_ip from remote hostname
+  ansible.builtin.set_fact:
+    db_ip: "{{ database_hostname }}"
+  when: database_hostname
+
+- name: Override web_ip with manager_hostname if configured
+  ansible.builtin.set_fact:
+    web_ip: "{{ manager_hostname }}"
+  when: manager_hostname is defined

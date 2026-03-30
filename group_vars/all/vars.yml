@@ -1,0 +1,8 @@
+---
+# Group-level overrides.
+# Role defaults live in defaults/main.yml — only override here what differs
+# from those defaults for this specific deployment.
+
+# zones must match the zone groups defined in inventory
+zones:
+  - zone1

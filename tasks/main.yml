@@ -1,0 +1,21 @@
+---
+# Entry point for the kasm role.
+# Set kasm_action to control what the role does (default: deploy).
+#
+# Valid actions:
+#   deploy    — install Kasm on hosts where it is not yet running
+#   upgrade   — upgrade Kasm to the installer tarball in files/
+#   uninstall — remove all Kasm containers, images, volumes, and /opt/kasm
+#   start     — start Kasm services
+#   stop      — stop Kasm services
+#   restart   — stop then start Kasm services
+#   backup    — backup the Kasm database (runs only on hosts with 'db' service)
+
+- name: Run preflight checks
+  ansible.builtin.include_tasks:
+    file: preflight.yml
+  when: kasm_action in ['deploy', 'upgrade']
+
+- name: "Run {{ kasm_action }} tasks"
+  ansible.builtin.include_tasks:
+    file: "{{ kasm_action }}.yml"

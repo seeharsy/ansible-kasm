@@ -1,0 +1,6 @@
+backup/
+*.tar.gz
+*.tar
+
+# Ignore unencrypted vault — encrypt before committing
+# group_vars/all/vault.yml is safe to commit only when vault-encrypted

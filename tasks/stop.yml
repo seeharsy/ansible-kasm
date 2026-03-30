@@ -1,0 +1,6 @@
+---
+- name: Stop Kasm services
+  ansible.builtin.command: /opt/kasm/bin/stop
+  register: stop_output
+  changed_when: '"done" in stop_output.stderr'
+  become: true

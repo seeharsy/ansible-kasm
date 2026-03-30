@@ -1,0 +1,32 @@
+---
+- name: Wait for web API to be healthy
+  ansible.builtin.uri:
+    url: "https://{{ web_ip }}:{{ proxy_port }}/api/__healthcheck"
+    timeout: 5
+    validate_certs: false
+  register: _result
+  until: _result.status == 200
+  retries: 60
+  delay: 10
+  tags: install
+
+- name: "Install agent role — this may take several minutes while Docker images are pulled"
+  ansible.builtin.command: >
+    bash {{ tempdir.path }}/kasm_release/install.sh
+      --role agent
+      --accept-eula
+      --proxy-port {{ proxy_port }}
+      --public-hostname {{ target_ip }}
+      --manager-hostname {{ web_ip }}
+      --manager-token {{ manager_token }}
+      {{ '-s ' ~ service_images_copy.dest if (service_images_file is not none and service_images_file | length > 0) else '' }}
+      {{ '-w ' ~ workspace_images_copy.dest if (workspace_images_file is not none and workspace_images_file | length > 0) else '' }}
+      {{ '-x ' ~ network_plugin_copy.dest if (network_plugin_file is not none and network_plugin_file | length > 0) else '' }}
+      {{ '--no-check-ports' if kasm_no_check_ports else '' }}
+      {{ '--no-check-disk' if kasm_no_check_disk else '' }}
+  register: install_output
+  become: true
+  changed_when: install_output.rc == 0
+  async: 2400
+  poll: 15
+  tags: install
