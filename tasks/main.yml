@@ -10,6 +10,8 @@
 #   stop      — stop Kasm services
 #   restart   — stop then start Kasm services
 #   backup    — backup the Kasm database (runs only on hosts with 'db' service)
+#   restore   — restore the Kasm database from a backup file (runs only on hosts with 'db' service)
+#   certs     — apply custom server cert/key and root CA; reapplied automatically on upgrade
 
 - name: Run preflight checks
   ansible.builtin.include_tasks:

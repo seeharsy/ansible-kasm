@@ -94,7 +94,6 @@
     bash {{ tempdir.path }}/kasm_release/install.sh
       --role all
       --accept-eula
-      --no-db-init
       --no-start
       --proxy-port {{ proxy_port }}
       --db-password {{ database_password }}
@@ -159,6 +158,11 @@
   retries: 60
   delay: 10
   when: "'web' in kasm_services"
+
+- name: Apply certificates
+  ansible.builtin.include_tasks:
+    file: certs.yml
+  when: kasm_server_cert | length > 0 or kasm_root_ca | length > 0
 
 - name: Remove temporary working directory
   ansible.builtin.file:

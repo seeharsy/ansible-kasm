@@ -1,11 +1,17 @@
-# kasm
+# ansible-kasm
 
 Ansible role for deploying and managing [Kasm Workspaces](https://www.kasmweb.com). Supports all-in-one and distributed multi-server deployments across single or multiple zones.
 
 ## Requirements
 
 - Ansible 2.10 or greater on the control node
-- Target hosts: Debian/Ubuntu (tested on Debian 13)
+- `community.docker` collection — install with:
+  ```bash
+  ansible-galaxy collection install -r requirements.yml
+  ```
+- Target hosts: Debian 12+, Ubuntu 22.04+, or Rocky Linux 9/10
+- Target hosts must have passwordless sudo configured for the Ansible SSH user
+- `python3-docker` is installed automatically on target hosts during deploy
 
 ## Role structure
 
@@ -35,12 +41,8 @@ All operations go through a single playbook. The `kasm_action` variable controls
 | Stop | `ansible-playbook -i inventory deploy_and_configure_kasm.yml -e kasm_action=stop` |
 | Restart | `ansible-playbook -i inventory deploy_and_configure_kasm.yml -e kasm_action=restart` |
 | Backup DB | `ansible-playbook -i inventory deploy_and_configure_kasm.yml -e kasm_action=backup` |
-
-For start/stop/restart you may want to run serially to avoid a full outage:
-
-```bash
-ansible-playbook -i inventory deploy_and_configure_kasm.yml -e kasm_action=restart -e kasm_serial=1
-```
+| Restore DB | `ansible-playbook -i inventory deploy_and_configure_kasm.yml -e kasm_action=restore -e kasm_restore_file=/path/to/backup.tar.gz` |
+| Apply certs | `ansible-playbook -i inventory deploy_and_configure_kasm.yml -e kasm_action=certs` |
 
 ## Inventory
 
@@ -100,7 +102,7 @@ zones:
 
 ## Credentials
 
-Credentials are auto-generated on first deploy and written to `group_vars/all/vault.yml`. You should encrypt this file before committing:
+Credentials are auto-generated on first deploy and written to `group_vars/all/vault.yml`. Encrypt this file before committing:
 
 ```bash
 ansible-vault encrypt group_vars/all/vault.yml
@@ -126,14 +128,78 @@ All variables and their defaults are documented in `defaults/main.yml`. Key vari
 | `kasm_enable_lossless` | `false` | Enable lossless streaming |
 | `kasm_default_registry_url` | `""` | Override default Workspaces Registry URL |
 | `kasm_guac_cluster_size` | `""` | guacd instances (empty = 1 per CPU core) |
+| `kasm_no_check_ports` | `false` | Disable installer open-port checks |
+| `kasm_no_check_disk` | `false` | Disable installer disk-space checks |
+| `kasm_server_cert` | `""` | Path to server certificate (PEM) |
+| `kasm_server_key` | `""` | Path to server private key (PEM) |
+| `kasm_root_ca` | `""` | Path to custom root CA (required for OIDC provider trust) |
+| `kasm_certs_remote` | `false` | `true` if cert files are already on the target host |
+| `kasm_restore_file` | `""` | Path to backup tar.gz to restore from |
+| `kasm_restore_remote` | `false` | `true` if backup file is already on the target host |
 
-## Licence
+## Licence key
 
 Place your activation key file in `files/` and set the filename in `group_vars` or `host_vars`:
 
 ```yaml
 kasm_activation_key_file: kasm_activation.key
 ```
+
+## Certificates
+
+Apply a custom server certificate, private key, and/or root CA:
+
+```bash
+# Cert files on the Ansible control node (default)
+ansible-playbook -i inventory deploy_and_configure_kasm.yml \
+  -e kasm_action=certs \
+  -e kasm_server_cert=/path/to/server.crt \
+  -e kasm_server_key=/path/to/server.key \
+  -e kasm_root_ca=/path/to/ca.crt
+
+# Cert files already on the target host
+ansible-playbook -i inventory deploy_and_configure_kasm.yml \
+  -e kasm_action=certs \
+  -e kasm_certs_remote=true \
+  -e kasm_server_cert=/etc/ssl/certs/server.crt \
+  -e kasm_server_key=/etc/ssl/private/server.key \
+  -e kasm_root_ca=/etc/ssl/certs/ca.crt
+```
+
+The root CA is mounted into the `kasm_api` container so that OIDC providers signed by a private CA are trusted. Certificates are reapplied automatically on upgrade.
+
+## Database backup
+
+```bash
+ansible-playbook -i inventory deploy_and_configure_kasm.yml -e kasm_action=backup
+```
+
+Backups are written to `remote_backup_dir` on the DB host (default `/srv/backup/kasm/`) and retained for `retention_days` days (default `10`).
+
+To fetch backups to the control node:
+
+```bash
+ansible-playbook -i inventory deploy_and_configure_kasm.yml \
+  -e kasm_action=backup \
+  -e local_backup_dir=/path/to/local/backups/
+```
+
+## Database restore
+
+```bash
+# Backup file on the Ansible control node (default)
+ansible-playbook -i inventory deploy_and_configure_kasm.yml \
+  -e kasm_action=restore \
+  -e kasm_restore_file=/path/to/kasm_db_backup.tar.gz
+
+# Backup file already on the target host
+ansible-playbook -i inventory deploy_and_configure_kasm.yml \
+  -e kasm_action=restore \
+  -e kasm_restore_file=/srv/backup/kasm/kasm_db_backup.tar.gz \
+  -e kasm_restore_remote=true
+```
+
+Restore only runs on hosts that have `db` in `kasm_services`. All Kasm services are stopped before the restore and restarted afterwards.
 
 ## Offline installation
 
@@ -157,22 +223,6 @@ database_ssl: true
 init_remote_db: true  # set to false after first deploy
 ```
 
-## Database backup
-
-```bash
-ansible-playbook -i inventory deploy_and_configure_kasm.yml -e kasm_action=backup
-```
-
-Backups are written to `remote_backup_dir` on the DB host (default `/srv/backup/kasm/`) and retained for `retention_days` days (default `10`).
-
-To fetch backups to the control node:
-
-```bash
-ansible-playbook -i inventory deploy_and_configure_kasm.yml \
-  -e kasm_action=backup \
-  -e local_backup_dir=/path/to/local/backups/
-```
-
 ## Recovering credentials
 
 If credentials are lost they can be recovered from a running deployment:
@@ -184,3 +234,11 @@ sudo grep " password" /opt/kasm/current/conf/app/api/api.app.config.yaml
 # Manager token (on an agent host)
 sudo grep "token" /opt/kasm/current/conf/app/agent/agent.app.config.yaml
 ```
+
+## Acknowledgements
+
+This role was originally developed by referencing the official [kasmtech/ansible-kasm](https://github.com/kasmtech/ansible-kasm) project. It has since been independently rewritten with a different structure and feature set, but credit is due for the foundational approach.
+
+## License
+
+MIT — see [LICENSE](LICENSE).

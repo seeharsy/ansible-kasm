@@ -1,0 +1,113 @@
+---
+# Apply custom TLS certificates and root CA to Kasm.
+# Run standalone with kasm_action=certs, or automatically at the end of upgrade.
+#
+# kasm_server_cert — path to server certificate (PEM)
+# kasm_server_key  — path to server private key (PEM)
+# kasm_root_ca     — path to custom root CA (required for OIDC provider trust)
+# kasm_certs_remote — false (default): paths are on the Ansible control node
+#                     true: paths are already on the target host
+#
+# cert/key are written to /opt/kasm/current/certs/ via the symlink — version-agnostic
+# and automatically picked up by proxy, rdp_gateway, and rdp_https_gateway containers.
+#
+# root CA is added to the host trust store and mounted read-only into kasm_api so the
+# API container can verify the OIDC provider's certificate chain.
+
+- name: Copy server certificate from control node
+  ansible.builtin.copy:
+    src: "{{ kasm_server_cert }}"
+    dest: /opt/kasm/current/certs/kasm_nginx.crt
+    mode: "0644"
+  become: true
+  when: kasm_server_cert | length > 0 and not kasm_certs_remote
+  register: _cert_copy_local
+
+- name: Copy server certificate from target host
+  ansible.builtin.copy:
+    src: "{{ kasm_server_cert }}"
+    dest: /opt/kasm/current/certs/kasm_nginx.crt
+    mode: "0644"
+    remote_src: true
+  become: true
+  when: kasm_server_cert | length > 0 and kasm_certs_remote
+  register: _cert_copy_remote
+
+- name: Copy server private key from control node
+  ansible.builtin.copy:
+    src: "{{ kasm_server_key }}"
+    dest: /opt/kasm/current/certs/kasm_nginx.key
+    mode: "0600"
+  become: true
+  when: kasm_server_key | length > 0 and not kasm_certs_remote
+  register: _key_copy_local
+
+- name: Copy server private key from target host
+  ansible.builtin.copy:
+    src: "{{ kasm_server_key }}"
+    dest: /opt/kasm/current/certs/kasm_nginx.key
+    mode: "0600"
+    remote_src: true
+  become: true
+  when: kasm_server_key | length > 0 and kasm_certs_remote
+  register: _key_copy_remote
+
+- name: Copy root CA to host trust store from control node
+  ansible.builtin.copy:
+    src: "{{ kasm_root_ca }}"
+    dest: "/usr/local/share/ca-certificates/{{ kasm_root_ca | basename }}"
+    mode: "0644"
+  become: true
+  when: kasm_root_ca | length > 0 and not kasm_certs_remote
+  register: _ca_copy_local
+
+- name: Copy root CA to host trust store from target host
+  ansible.builtin.copy:
+    src: "{{ kasm_root_ca }}"
+    dest: "/usr/local/share/ca-certificates/{{ kasm_root_ca | basename }}"
+    mode: "0644"
+    remote_src: true
+  become: true
+  when: kasm_root_ca | length > 0 and kasm_certs_remote
+  register: _ca_copy_remote
+
+- name: Update host CA certificates
+  ansible.builtin.command: update-ca-certificates
+  become: true
+  changed_when: true
+  when: (_ca_copy_local is changed) or (_ca_copy_remote is changed)
+
+- name: Mount host CA bundle into kasm_api container
+  ansible.builtin.lineinfile:
+    path: /opt/kasm/current/docker/docker-compose.yaml
+    insertafter: '.*tmp/api:/tmp'
+    line: "      - /etc/ssl/certs/:/etc/ssl/certs/:ro"
+    regexp: '^\s+- /etc/ssl/certs/'
+  become: true
+  when: kasm_root_ca | length > 0
+  register: _compose_modified
+
+- name: Set cert changes fact
+  ansible.builtin.set_fact:
+    _kasm_certs_changed: >-
+      {{
+        (_cert_copy_local    is defined and _cert_copy_local    is changed) or
+        (_cert_copy_remote   is defined and _cert_copy_remote   is changed) or
+        (_key_copy_local     is defined and _key_copy_local     is changed) or
+        (_key_copy_remote    is defined and _key_copy_remote    is changed) or
+        (_ca_copy_local      is defined and _ca_copy_local      is changed) or
+        (_ca_copy_remote     is defined and _ca_copy_remote     is changed) or
+        (_compose_modified   is defined and _compose_modified   is changed)
+      }}
+
+- name: Stop Kasm to apply certificate changes
+  ansible.builtin.command: /opt/kasm/bin/stop
+  become: true
+  changed_when: true
+  when: _kasm_certs_changed
+
+- name: Start Kasm after certificate changes
+  ansible.builtin.command: /opt/kasm/bin/start
+  become: true
+  changed_when: true
+  when: _kasm_certs_changed

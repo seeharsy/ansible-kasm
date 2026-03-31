@@ -61,6 +61,18 @@ registration_token: "{{ vault_registration_token }}"
 remote_backup_dir: /srv/backup/kasm/
 retention_days: 10
 
+# Database restore
+kasm_restore_file: ""          # Path to backup tar.gz to restore from
+kasm_restore_remote: false     # true = file is already on the target host
+
+# Certificates
+# Set kasm_certs_remote: false if cert files live on the Ansible control node (default).
+# Set kasm_certs_remote: true  if cert files are already present on the target host.
+kasm_certs_remote: false
+kasm_server_cert: ""   # Path to server certificate (PEM)
+kasm_server_key: ""    # Path to server private key (PEM)
+kasm_root_ca: ""       # Path to custom root CA — required for OIDC provider trust
+
 # Licence
 # Filename of the activation key file placed in the role's files/ directory.
 # Leave empty to install without a licence key.

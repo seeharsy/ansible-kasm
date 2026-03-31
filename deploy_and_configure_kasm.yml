@@ -20,9 +20,21 @@
 #   Restart services:
 #     ansible-playbook deploy_and_configure_kasm.yml -e kasm_action=restart
 #
+#   Apply certificates (control node paths):
+#     ansible-playbook deploy_and_configure_kasm.yml -e kasm_action=certs
+#
+#   Apply certificates (already on target host):
+#     ansible-playbook deploy_and_configure_kasm.yml -e kasm_action=certs -e kasm_certs_remote=true
+#
 #   Backup database:
 #     ansible-playbook deploy_and_configure_kasm.yml -e kasm_action=backup
 #     ansible-playbook deploy_and_configure_kasm.yml -e kasm_action=backup -e local_backup_dir=/tmp/kasm_backups/
+#
+#   Restore database (file on control node):
+#     ansible-playbook deploy_and_configure_kasm.yml -e kasm_action=restore -e kasm_restore_file=/tmp/kasm_db_backup.tar.gz
+#
+#   Restore database (file already on target host):
+#     ansible-playbook deploy_and_configure_kasm.yml -e kasm_action=restore -e kasm_restore_file=/srv/backup/kasm_db_backup.tar.gz -e kasm_restore_remote=true
 
 - hosts: all
   # Abort the entire play immediately if any host fails — prevents a partially

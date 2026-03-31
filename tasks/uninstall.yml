@@ -2,76 +2,71 @@
 # Remove all Kasm containers, images, volumes, networks, and /opt/kasm.
 # Remote databases are not touched — data there persists.
 
-- name: Get Kasm service container IDs
-  ansible.builtin.command: docker ps -f name=kasm_ -qa
-  register: service_containers
-  changed_when: false
-  become: true
-  ignore_errors: true
-
 - name: Remove Kasm service containers
-  ansible.builtin.command: "docker rm -f {{ item }}"
+  community.docker.docker_container:
+    name: "{{ item }}"
+    state: absent
+    force_kill: true
   become: true
-  changed_when: true
   ignore_errors: true
-  loop: "{{ service_containers.stdout_lines }}"
+  loop:
+    - kasm_db
+    - kasm_api
+    - kasm_manager
+    - kasm_agent
+    - kasm_guac
+    - kasm_rdp_gateway
+    - kasm_rdp_https_gateway
+    - kasm_proxy
 
-- name: Get Kasm session container IDs
-  ansible.builtin.command: docker container ls -qa --filter=label=kasm.kasmid
-  register: session_containers
-  changed_when: false
+- name: Get Kasm session container info
+  community.docker.docker_host_info:
+    containers: true
+    containers_all: true
+    containers_filters:
+      label: kasm.kasmid
   become: true
+  register: _session_info
   ignore_errors: true
 
 - name: Remove Kasm session containers
-  ansible.builtin.command: "docker rm -f {{ item }}"
+  community.docker.docker_container:
+    name: "{{ item.Names[0] | regex_replace('^/', '') }}"
+    state: absent
+    force_kill: true
   become: true
-  changed_when: true
   ignore_errors: true
-  loop: "{{ session_containers.stdout_lines }}"
+  loop: "{{ _session_info.containers | default([]) }}"
 
-- name: Get Kasm default network ID
-  ansible.builtin.command: docker network ls -q -f name=kasm_default_network
-  register: kasm_network
+- name: Remove Kasm networks
+  community.docker.docker_network:
+    name: "{{ item }}"
+    state: absent
+    force: true
   become: true
   ignore_errors: true
-  changed_when: false
+  loop:
+    - kasm_default_network
+    - kasm_sidecar_network
 
-- name: Remove Kasm default network
-  ansible.builtin.command: docker network rm kasm_default_network
-  ignore_errors: true
+- name: Get Kasm database volume info
+  community.docker.docker_host_info:
+    volumes: true
+    volumes_filters:
+      name: kasm_db_
   become: true
-  changed_when: true
-  when: kasm_network.stdout | length > 0
-
-- name: Get Kasm sidecar network ID
-  ansible.builtin.command: docker network ls -q -f name=kasm_sidecar_network
-  register: kasm_sidecar_network
-  become: true
+  register: _volume_info
   ignore_errors: true
-  changed_when: false
-
-- name: Remove Kasm sidecar network
-  ansible.builtin.command: docker network rm kasm_sidecar_network
-  ignore_errors: true
-  become: true
-  changed_when: true
-  when: kasm_sidecar_network.stdout | length > 0
-
-- name: Get Kasm database volume names
-  ansible.builtin.command: docker volume ls --filter name=kasm_db_ -q
-  ignore_errors: true
-  become: true
-  register: kasm_database
-  changed_when: false
 
 - name: Remove Kasm database volumes
-  ansible.builtin.command: "docker volume rm {{ item }}"
-  ignore_errors: true
+  community.docker.docker_volume:
+    name: "{{ item.Name }}"
+    state: absent
   become: true
-  changed_when: true
-  loop: "{{ kasm_database.stdout_lines }}"
+  ignore_errors: true
+  loop: "{{ _volume_info.volumes | default([]) }}"
 
+# Images have multiple tags per image ID; command handles deduplication cleanly.
 - name: Get Kasm Docker image IDs
   ansible.builtin.shell: |
     docker images --filter "label=com.kasmweb.image=true" -q
@@ -87,12 +82,11 @@
     docker images kasmweb/kasm-guac -q
     docker images kasmweb/kasm-guac-private -q
     docker images kasmweb/proxy -q
-    docker images kasmweb/proxy-private -q
-    docker images postgres -q
     docker images kasmweb/rdp-gateway -q
     docker images kasmweb/rdp-gateway-private -q
     docker images kasmweb/rdp-https-gateway -q
     docker images kasmweb/rdp-https-gateway-private -q
+    docker images postgres -q
   register: kasm_images
   become: true
   ignore_errors: true
@@ -105,6 +99,7 @@
   changed_when: true
   loop: "{{ kasm_images.stdout_lines | unique }}"
 
+# No Ansible module for Docker plugins — command is the only option.
 - name: List Docker plugins
   ansible.builtin.command: docker plugin ls
   become: true

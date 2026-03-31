@@ -1,0 +1,79 @@
+---
+# Restore the Kasm PostgreSQL database from a backup.
+# Only runs on hosts that include 'db' in kasm_services.
+#
+# kasm_restore_file   — path to the backup tar.gz to restore from
+# kasm_restore_remote — false (default): file is on the Ansible control node, copied across
+#                       true: file is already present on the target host
+
+- name: Skip hosts without db service
+  ansible.builtin.meta: end_host
+  when: "'db' not in kasm_services"
+
+- name: Assert restore file is specified
+  ansible.builtin.assert:
+    that: kasm_restore_file | length > 0
+    fail_msg: "kasm_restore_file must be set to the path of the backup file to restore."
+
+- name: Copy backup file to target host
+  ansible.builtin.copy:
+    src: "{{ kasm_restore_file }}"
+    dest: /tmp/kasm_restore.tar.gz
+    mode: "0600"
+  become: true
+  when: not kasm_restore_remote
+
+- name: Set restore file path on target
+  ansible.builtin.set_fact:
+    _restore_path: "{{ kasm_restore_file if kasm_restore_remote else '/tmp/kasm_restore.tar.gz' }}"
+
+- name: Stop Kasm services
+  ansible.builtin.command: /opt/kasm/bin/stop
+  become: true
+  changed_when: true
+
+- name: Start database container
+  community.docker.docker_container:
+    name: kasm_db
+    state: started
+  become: true
+
+- name: Wait for database to be ready
+  community.docker.docker_container_exec:
+    container: kasm_db
+    command: pg_isready -U kasmapp
+  become: true
+  register: _pg_ready
+  until: _pg_ready.rc == 0
+  retries: 30
+  delay: 2
+
+# No module equivalent for docker cp — command is the only option.
+- name: Copy backup file into database container
+  ansible.builtin.command: "docker cp {{ _restore_path }} kasm_db:/tmp/kasm_restore.tar.gz"
+  become: true
+  changed_when: true
+
+- name: Restore database from backup
+  community.docker.docker_container_exec:
+    container: kasm_db
+    command: /bin/bash -c "gunzip -c /tmp/kasm_restore.tar.gz | pg_restore -U kasmapp -w -d kasm --clean --if-exists"
+  become: true
+
+- name: Remove backup file from database container
+  community.docker.docker_container_exec:
+    container: kasm_db
+    command: rm -f /tmp/kasm_restore.tar.gz
+  become: true
+
+- name: Remove backup file from target host
+  ansible.builtin.file:
+    path: /tmp/kasm_restore.tar.gz
+    state: absent
+  become: true
+  when: not kasm_restore_remote
+
+- name: Start Kasm services
+  ansible.builtin.command: /opt/kasm/bin/start
+  become: true
+  changed_when: true

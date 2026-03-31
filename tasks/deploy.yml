@@ -36,9 +36,11 @@
     state: directory
   register: tempdir
 
-- name: Ensure curl is installed
+- name: Ensure required packages are installed
   ansible.builtin.package:
-    name: curl
+    name:
+      - curl
+      - python3-docker
     state: present
   become: true
 
