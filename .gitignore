@@ -2,5 +2,8 @@ backup/
 *.tar.gz
 *.tar
 
-# Ignore unencrypted vault — encrypt before committing
-# group_vars/all/vault.yml is safe to commit only when vault-encrypted
+# Inventory contains host IPs — keep local
+inventory
+
+# Vault contains plaintext credentials — encrypt before committing
+group_vars/all/vault.yml
