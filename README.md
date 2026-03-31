@@ -5,9 +5,9 @@ Ansible role for deploying and managing [Kasm Workspaces](https://www.kasmweb.co
 ## Requirements
 
 - Ansible 2.10 or greater on the control node
-- `community.docker` collection — install with:
+- `community.docker` collection and `geerlingguy.docker` role — install with:
   ```bash
-  ansible-galaxy collection install -r requirements.yml
+  ansible-galaxy install -r requirements.yml
   ```
 - Target hosts: Debian 12+, Ubuntu 22.04+, or Rocky Linux 9/10
 - Target hosts must have passwordless sudo configured for the Ansible SSH user

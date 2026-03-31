@@ -36,11 +36,21 @@
     state: directory
   register: tempdir
 
-- name: Ensure required packages are installed
+- name: Install Docker
+  ansible.builtin.include_role:
+    name: geerlingguy.docker
+    apply:
+      become: true
+
+- name: Ensure curl is installed
   ansible.builtin.package:
-    name:
-      - curl
-      - python3-docker
+    name: curl
+    state: present
+  become: true
+
+- name: Ensure Docker Python SDK is installed
+  ansible.builtin.pip:
+    name: docker
     state: present
   become: true
 
