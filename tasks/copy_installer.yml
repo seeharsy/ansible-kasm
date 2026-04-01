@@ -24,9 +24,9 @@
       {%- else -%}
         {{ _base_glob | sort | last | default(None) }}
       {%- endif -%}
-    service_images_file:   "{{ service_images_glob  | default([]) | sort | last | default(None) }}"
+    service_images_file: "{{ service_images_glob | default([]) | sort | last | default(None) }}"
     workspace_images_file: "{{ workspace_images_glob | default([]) | sort | last | default(None) }}"
-    network_plugin_file:   "{{ network_plugin_glob   | default([]) | sort | last | default(None) }}"
+    network_plugin_file: "{{ network_plugin_glob | default([]) | sort | last | default(None) }}"
   tags: [install, upgrade]
 
 - name: Show selected installer
@@ -59,6 +59,7 @@
   ansible.builtin.copy:
     src: "{{ service_images_file }}"
     dest: "{{ tempdir.path }}"
+    mode: "0644"
   register: service_images_copy
   when: service_images_file is not none and service_images_file | length > 0
   tags: [install, upgrade]
@@ -67,6 +68,7 @@
   ansible.builtin.copy:
     src: "{{ workspace_images_file }}"
     dest: "{{ tempdir.path }}"
+    mode: "0644"
   register: workspace_images_copy
   when: workspace_images_file is not none and workspace_images_file | length > 0
   tags: [install, upgrade]
@@ -75,6 +77,7 @@
   ansible.builtin.copy:
     src: "{{ network_plugin_file }}"
     dest: "{{ tempdir.path }}"
+    mode: "0644"
   register: network_plugin_copy
   when: network_plugin_file is not none and network_plugin_file | length > 0
   tags: [install, upgrade]

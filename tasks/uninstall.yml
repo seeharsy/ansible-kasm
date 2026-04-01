@@ -8,7 +8,7 @@
     state: absent
     force_kill: true
   become: true
-  ignore_errors: true
+  failed_when: false
   loop:
     - kasm_db
     - kasm_api
@@ -27,7 +27,7 @@
       label: kasm.kasmid
   become: true
   register: _session_info
-  ignore_errors: true
+  failed_when: false
 
 - name: Remove Kasm session containers
   community.docker.docker_container:
@@ -35,7 +35,7 @@
     state: absent
     force_kill: true
   become: true
-  ignore_errors: true
+  failed_when: false
   loop: "{{ _session_info.containers | default([]) }}"
 
 - name: Remove Kasm networks
@@ -44,7 +44,7 @@
     state: absent
     force: true
   become: true
-  ignore_errors: true
+  failed_when: false
   loop:
     - kasm_default_network
     - kasm_sidecar_network
@@ -56,14 +56,14 @@
       name: kasm_db_
   become: true
   register: _volume_info
-  ignore_errors: true
+  failed_when: false
 
 - name: Remove Kasm database volumes
   community.docker.docker_volume:
     name: "{{ item.Name }}"
     state: absent
   become: true
-  ignore_errors: true
+  failed_when: false
   loop: "{{ _volume_info.volumes | default([]) }}"
 
 # Images have multiple tags per image ID; command handles deduplication cleanly.
@@ -89,13 +89,13 @@
     docker images postgres -q
   register: kasm_images
   become: true
-  ignore_errors: true
+  failed_when: false
   changed_when: false
 
 - name: Remove Kasm Docker images
   ansible.builtin.command: "docker rmi {{ item }}"
   become: true
-  ignore_errors: true
+  failed_when: false
   changed_when: true
   loop: "{{ kasm_images.stdout_lines | unique }}"
 
@@ -103,7 +103,7 @@
 - name: List Docker plugins
   ansible.builtin.command: docker plugin ls
   become: true
-  ignore_errors: true
+  failed_when: false
   changed_when: false
   register: plugin_list
 

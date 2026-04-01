@@ -11,10 +11,10 @@
 
 - name: Set component installation state facts
   ansible.builtin.set_fact:
-    db_installed:    "{{ 'kasm_db'    in kasm_containers.stdout }}"
-    web_installed:   "{{ 'kasm_api'   in kasm_containers.stdout }}"
+    db_installed: "{{ 'kasm_db' in kasm_containers.stdout }}"
+    web_installed: "{{ 'kasm_api' in kasm_containers.stdout }}"
     agent_installed: "{{ 'kasm_agent' in kasm_containers.stdout }}"
-    guac_installed:  "{{ 'kasm_guac'  in kasm_containers.stdout }}"
+    guac_installed: "{{ 'kasm_guac' in kasm_containers.stdout }}"
     proxy_installed: "{{ 'kasm_proxy' in kasm_containers.stdout }}"
 
 - name: Determine if this is an all-in-one deployment

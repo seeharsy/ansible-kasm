@@ -1,0 +1,8 @@
+---
+exclude_paths:
+  - .ansible/
+
+skip_list:
+  - meta-no-tags       # remote_desktop is a valid Galaxy tag
+  - schema[meta]       # EL platform versions don't match strict schema
+  - yaml[line-length]  # fileglob lookup expressions in copy_installer.yml are unavoidably long
