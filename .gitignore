@@ -7,3 +7,6 @@ inventory
 
 # Vault contains plaintext credentials — encrypt before committing
 group_vars/all/vault.yml
+
+# Generated credential files — load into vault, do not commit plaintext
+kasm_credentials_*.yml

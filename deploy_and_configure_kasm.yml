@@ -42,4 +42,4 @@
   # deployed or partially upgraded cluster from being left in a broken state.
   any_errors_fatal: true
   roles:
-    - role: seeharsy.kasm
+    - role: kasm

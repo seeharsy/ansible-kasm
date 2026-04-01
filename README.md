@@ -43,6 +43,7 @@ All operations go through a single playbook. The `kasm_action` variable controls
 | Backup DB | `ansible-playbook -i inventory deploy_and_configure_kasm.yml -e kasm_action=backup` |
 | Restore DB | `ansible-playbook -i inventory deploy_and_configure_kasm.yml -e kasm_action=restore -e kasm_restore_file=/path/to/backup.tar.gz` |
 | Apply certs | `ansible-playbook -i inventory deploy_and_configure_kasm.yml -e kasm_action=certs` |
+| Rename host | `ansible-playbook -i inventory deploy_and_configure_kasm.yml -e kasm_action=rename` |
 
 ## Inventory
 
@@ -102,10 +103,11 @@ zones:
 
 ## Credentials
 
-Credentials are auto-generated on first deploy and written to `group_vars/all/vault.yml`. Encrypt this file before committing:
+On first deploy, credentials are auto-generated and written to a file named `kasm_credentials_<host>_<date>.yml` alongside your inventory. This file is gitignored. Load its contents into your vault before committing:
 
 ```bash
-ansible-vault encrypt group_vars/all/vault.yml
+ansible-vault encrypt kasm_credentials_kasm_2026-04-01.yml
+# then move or merge the values into your group_vars/all/vault.yml
 ```
 
 To use a pre-existing set of credentials, populate `group_vars/all/vault.yml` before running the deploy.
@@ -133,7 +135,9 @@ All variables and their defaults are documented in `defaults/main.yml`. Key vari
 | `kasm_server_cert` | `""` | Path to server certificate (PEM) |
 | `kasm_server_key` | `""` | Path to server private key (PEM) |
 | `kasm_root_ca` | `""` | Path to custom root CA (required for OIDC provider trust) |
+| `kasm_root_ca_dest` | `/srv/ca.crt` | Destination path on the target host for the root CA |
 | `kasm_certs_remote` | `false` | `true` if cert files are already on the target host |
+| `kasm_hostname` | `""` | New hostname for `kasm_action=rename` (defaults to current OS hostname) |
 | `kasm_restore_file` | `""` | Path to backup tar.gz to restore from |
 | `kasm_restore_remote` | `false` | `true` if backup file is already on the target host |
 
@@ -166,7 +170,46 @@ ansible-playbook -i inventory deploy_and_configure_kasm.yml \
   -e kasm_root_ca=/etc/ssl/certs/ca.crt
 ```
 
-The root CA is mounted into the `kasm_api` container so that OIDC providers signed by a private CA are trusted. Certificates are reapplied automatically on upgrade.
+The root CA is copied to `kasm_root_ca_dest` on the host (default `/srv/ca.crt`) and injected into the `kasm_api` and `kasm_manager` containers via a `docker-compose.override.yml` with `REQUESTS_CA_BUNDLE` set. This allows Kasm to verify TLS certificates signed by a private CA, which is required when using an OIDC provider with an internal certificate. Certificates are reapplied automatically on upgrade.
+
+## Renaming a host
+
+There are situations where a Kasm host may need its hostname changed after installation — DNS reorganisation, environment promotion, naming convention changes, or simply correcting a mistake made at provisioning time. Whatever the reason, a mechanism to handle this cleanly is necessary.
+
+Kasm bakes the OS hostname into several config files and the database at install time. Changing the hostname at the OS level alone is not sufficient — the Kasm config files and the `managers` table in the database must also be updated, otherwise services will fail to start correctly.
+
+The `rename` action handles this automatically. The typical workflow is:
+
+1. Change the OS hostname (via `hostnamectl` or equivalent)
+2. Run the rename action — it detects the old hostname from the Kasm config and replaces it everywhere:
+
+```bash
+ansible-playbook -i inventory deploy_and_configure_kasm.yml -e kasm_action=rename
+```
+
+By default `kasm_action=rename` uses `ansible_hostname` (the current OS hostname) as the new hostname. If you want to set the OS hostname and update Kasm in a single step, pass the new name explicitly:
+
+```bash
+ansible-playbook -i inventory deploy_and_configure_kasm.yml \
+  -e kasm_action=rename \
+  -e kasm_hostname=newname
+```
+
+The task will abort early if the old and new hostnames are the same.
+
+**What gets updated:**
+
+- OS hostname via `hostnamectl`
+- `/etc/hosts` (127.0.1.1 entry)
+- `conf/app/agent/agent.app.config.yaml` — manager hostnames list
+- `conf/app/api/api.app.config.yaml` — server hostname
+- `conf/app/rdp_gateway/passthrough.app.config.yaml` — API hostnames list
+- `conf/app/rdp_https_gateway/rdp_https_gateway.app.config.yaml` — API hostnames list
+- `managers.manager_hostname` in the Kasm database
+
+Kasm is stopped before config changes and restarted afterwards.
+
+> **Note:** After a rename, `kasm_rdp_https_gateway` may do one crash-restart on first boot. This is because Kasm populates the hostnames list with both `proxy` (the Docker network alias) and the OS hostname, and the container attempts each in turn. The OS hostname is not resolvable within Docker's internal DNS — only `proxy` is. The container recovers immediately on restart and this has no functional impact.
 
 ## Database backup
 
