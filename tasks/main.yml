@@ -12,6 +12,7 @@
 #   backup    — backup the Kasm database (runs only on hosts with 'db' service)
 #   restore   — restore the Kasm database from a backup file (runs only on hosts with 'db' service)
 #   certs     — apply custom server cert/key and root CA; reapplied automatically on upgrade
+#   rename    — update OS hostname, Kasm config files, and database to match a new hostname
 
 - name: Run preflight checks
   ansible.builtin.include_tasks:

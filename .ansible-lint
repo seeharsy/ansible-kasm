@@ -2,6 +2,9 @@
 exclude_paths:
   - .ansible/
 
+mock_roles:
+  - kasm
+
 skip_list:
   - meta-no-tags       # remote_desktop is a valid Galaxy tag
   - schema[meta]       # EL platform versions don't match strict schema

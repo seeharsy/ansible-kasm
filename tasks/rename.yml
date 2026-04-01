@@ -1,0 +1,69 @@
+---
+# Rename a Kasm host — updates the OS hostname, Kasm config files, and database.
+# Run with: kasm_action=rename
+#
+# kasm_hostname — new hostname (defaults to ansible_hostname, i.e. the current OS hostname)
+#
+# Workflow: set OS hostname first, then run this action. The old hostname is
+# detected automatically from the Kasm API config file.
+
+- name: Read current hostname from Kasm API config
+  ansible.builtin.slurp:
+    src: /opt/kasm/current/conf/app/api/api.app.config.yaml
+  register: _api_config_raw
+  become: true
+
+- name: Set old and new hostname facts
+  ansible.builtin.set_fact:
+    _kasm_old_hostname: "{{ (_api_config_raw.content | b64decode | from_yaml).server.server_hostname }}"
+    _kasm_new_hostname: "{{ kasm_hostname | default(ansible_hostname) }}"
+
+- name: Abort if hostname has not changed
+  ansible.builtin.fail:
+    msg: "Old and new hostname are both '{{ _kasm_old_hostname }}' — nothing to do."
+  when: _kasm_old_hostname == _kasm_new_hostname
+
+- name: Set OS hostname
+  ansible.builtin.hostname:
+    name: "{{ _kasm_new_hostname }}"
+  become: true
+
+- name: Update /etc/hosts
+  ansible.builtin.replace:
+    path: /etc/hosts
+    regexp: '^(127\.0\.1\.1\s+){{ _kasm_old_hostname }}(\s.*)?$'
+    replace: '\g<1>{{ _kasm_new_hostname }}'
+  become: true
+
+- name: Update manager hostname in database
+  community.docker.docker_container_exec:
+    container: kasm_db
+    command: >-
+      psql -U kasmapp -d kasm
+      -c "UPDATE managers SET manager_hostname = '{{ _kasm_new_hostname }}'
+          WHERE manager_hostname = '{{ _kasm_old_hostname }}';"
+  become: true
+  register: _db_update
+  changed_when: "_db_update.stdout is defined and 'UPDATE 1' in _db_update.stdout"
+
+- name: Stop Kasm
+  ansible.builtin.command: /opt/kasm/bin/stop
+  become: true
+  changed_when: true
+
+- name: Replace hostname in Kasm config files
+  ansible.builtin.replace:
+    path: "{{ item }}"
+    regexp: "{{ _kasm_old_hostname }}"
+    replace: "{{ _kasm_new_hostname }}"
+  become: true
+  loop:
+    - /opt/kasm/current/conf/app/agent/agent.app.config.yaml
+    - /opt/kasm/current/conf/app/api/api.app.config.yaml
+    - /opt/kasm/current/conf/app/rdp_gateway/passthrough.app.config.yaml
+    - /opt/kasm/current/conf/app/rdp_https_gateway/rdp_https_gateway.app.config.yaml
+
+- name: Start Kasm
+  ansible.builtin.command: /opt/kasm/bin/start
+  become: true
+  changed_when: true

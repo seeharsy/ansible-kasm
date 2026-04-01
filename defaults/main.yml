@@ -79,6 +79,10 @@ kasm_root_ca_dest: /srv/ca.crt  # Destination path on the target host for the ro
 # Leave empty to install without a licence key.
 kasm_activation_key_file: ""
 
+# Hostname
+# Target hostname for kasm_action=rename. Defaults to the current OS hostname (ansible_hostname).
+kasm_hostname: ""
+
 # Optional installer feature flags — all off by default.
 kasm_enable_lossless: false        # Enable lossless streaming option
 kasm_default_registry_url: ""      # Override Workspaces Registry URL (empty = use Kasm default)

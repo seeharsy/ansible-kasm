@@ -182,30 +182,32 @@
     state: absent
   become: true
 
+- name: Write credentials to local file
+  ansible.builtin.copy:
+    content: |
+      ---
+      # Kasm credentials for {{ inventory_hostname }} — generated {{ ansible_date_time.date }}
+      # Load these into your vault: ansible-vault encrypt <this file>, then reference via group_vars.
+      vault_user_password: "{{ user_password }}"
+      vault_admin_password: "{{ admin_password }}"
+      vault_database_password: "{{ database_password }}"
+      vault_manager_token: "{{ manager_token }}"
+      vault_registration_token: "{{ registration_token }}"
+    dest: "{{ inventory_dir }}/kasm_credentials_{{ inventory_hostname }}_{{ ansible_date_time.date }}.yml"
+    mode: "0600"
+  run_once: true
+  delegate_to: localhost
+
 - name: Display credentials
   ansible.builtin.debug:
     msg:
+      - "Credentials written to kasm_credentials_{{ inventory_hostname }}_{{ ansible_date_time.date }}.yml"
       - "Database Password : {{ database_password }}"
       - "Manager Token     : {{ manager_token }}"
       - "Registration Token: {{ registration_token }}"
       - "user@kasm.local   : {{ user_password }}"
       - "admin@kasm.local  : {{ admin_password }}"
   run_once: true
-
-- name: Write credentials back to vault file
-  ansible.builtin.copy:
-    content: |
-      ---
-      # Encrypt this file with: ansible-vault encrypt group_vars/all/vault.yml
-      vault_user_password: "{{ user_password }}"
-      vault_admin_password: "{{ admin_password }}"
-      vault_database_password: "{{ database_password }}"
-      vault_manager_token: "{{ manager_token }}"
-      vault_registration_token: "{{ registration_token }}"
-    dest: "{{ inventory_dir }}/group_vars/all/vault.yml"
-    mode: "0600"
-  run_once: true
-  delegate_to: localhost
 
 - name: Disable remote db init after successful run
   ansible.builtin.replace:
