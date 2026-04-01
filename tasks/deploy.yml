@@ -48,11 +48,26 @@
     state: present
   become: true
 
-- name: Ensure Docker Python SDK is installed
+- name: Ensure Docker Python SDK is installed (Debian/Ubuntu)
+  ansible.builtin.package:
+    name: python3-docker
+    state: present
+  become: true
+  when: ansible_os_family == 'Debian'
+
+- name: Ensure pip is installed (RedHat)
+  ansible.builtin.package:
+    name: python3-pip
+    state: present
+  become: true
+  when: ansible_os_family == 'RedHat'
+
+- name: Ensure Docker Python SDK is installed (RedHat)
   ansible.builtin.pip:
     name: docker
     state: present
   become: true
+  when: ansible_os_family == 'RedHat'
 
 - name: Copy activation key file to target
   ansible.builtin.copy:

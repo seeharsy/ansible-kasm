@@ -1,0 +1,14 @@
+# Managed by Ansible — do not edit manually.
+# Injects the custom root CA into Kasm API and Manager containers so they can
+# verify TLS certificates signed by an internal CA (e.g. for OIDC providers).
+services:
+  kasm_api:
+    volumes:
+      - {{ kasm_root_ca_dest }}:{{ kasm_root_ca_dest }}:ro
+    environment:
+      REQUESTS_CA_BUNDLE: "{{ kasm_root_ca_dest }}"
+  kasm_manager:
+    volumes:
+      - {{ kasm_root_ca_dest }}:{{ kasm_root_ca_dest }}:ro
+    environment:
+      REQUESTS_CA_BUNDLE: "{{ kasm_root_ca_dest }}"

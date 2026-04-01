@@ -72,6 +72,7 @@ kasm_certs_remote: false
 kasm_server_cert: ""   # Path to server certificate (PEM)
 kasm_server_key: ""    # Path to server private key (PEM)
 kasm_root_ca: ""       # Path to custom root CA — required for OIDC provider trust
+kasm_root_ca_dest: /srv/ca.crt  # Destination path on the target host for the root CA
 
 # Licence
 # Filename of the activation key file placed in the role's files/ directory.

@@ -11,8 +11,8 @@
 # cert/key are written to /opt/kasm/current/certs/ via the symlink — version-agnostic
 # and automatically picked up by proxy, rdp_gateway, and rdp_https_gateway containers.
 #
-# root CA is added to the host trust store and mounted read-only into kasm_api so the
-# API container can verify the OIDC provider's certificate chain.
+# root CA is copied to kasm_root_ca_dest on the host and injected into kasm_api and
+# kasm_manager via a docker-compose.override.yml with REQUESTS_CA_BUNDLE set.
 
 - name: Copy server certificate from control node
   ansible.builtin.copy:
@@ -52,37 +52,30 @@
   when: kasm_server_key | length > 0 and kasm_certs_remote
   register: _key_copy_remote
 
-- name: Copy root CA to host trust store from control node
+- name: Copy root CA to host from control node
   ansible.builtin.copy:
     src: "{{ kasm_root_ca }}"
-    dest: "/usr/local/share/ca-certificates/{{ kasm_root_ca | basename }}"
+    dest: "{{ kasm_root_ca_dest }}"
     mode: "0644"
   become: true
   when: kasm_root_ca | length > 0 and not kasm_certs_remote
   register: _ca_copy_local
 
-- name: Copy root CA to host trust store from target host
+- name: Copy root CA to host from target host
   ansible.builtin.copy:
     src: "{{ kasm_root_ca }}"
-    dest: "/usr/local/share/ca-certificates/{{ kasm_root_ca | basename }}"
+    dest: "{{ kasm_root_ca_dest }}"
     mode: "0644"
     remote_src: true
   become: true
   when: kasm_root_ca | length > 0 and kasm_certs_remote
   register: _ca_copy_remote
 
-- name: Update host CA certificates
-  ansible.builtin.command: update-ca-certificates
-  become: true
-  changed_when: true
-  when: (_ca_copy_local is changed) or (_ca_copy_remote is changed)
-
-- name: Mount host CA bundle into kasm_api container
-  ansible.builtin.lineinfile:
-    path: /opt/kasm/current/docker/docker-compose.yaml
-    insertafter: '.*tmp/api:/tmp'
-    line: "      - /etc/ssl/certs/:/etc/ssl/certs/:ro"
-    regexp: '^\s+- /etc/ssl/certs/'
+- name: Template docker-compose override to inject root CA into kasm_api and kasm_manager
+  ansible.builtin.template:
+    src: docker-compose.override.yml.j2
+    dest: /opt/kasm/current/docker/docker-compose.override.yml
+    mode: "0644"
   become: true
   when: kasm_root_ca | length > 0
   register: _compose_modified
