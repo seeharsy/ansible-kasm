@@ -18,6 +18,6 @@
     file: preflight.yml
   when: kasm_action in ['deploy', 'upgrade']
 
-- name: "Run {{ kasm_action }} tasks"
+- name: "Run Kasm tasks: {{ kasm_action }}"
   ansible.builtin.include_tasks:
     file: "{{ kasm_action }}.yml"

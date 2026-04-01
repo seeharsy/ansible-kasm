@@ -36,9 +36,10 @@
 #   Restore database (file already on target host):
 #     ansible-playbook deploy_and_configure_kasm.yml -e kasm_action=restore -e kasm_restore_file=/srv/backup/kasm_db_backup.tar.gz -e kasm_restore_remote=true
 
-- hosts: all
+- name: Deploy and configure Kasm Workspaces
+  hosts: all
   # Abort the entire play immediately if any host fails — prevents a partially
   # deployed or partially upgraded cluster from being left in a broken state.
   any_errors_fatal: true
   roles:
-    - role: kasm
+    - role: seeharsy.kasm
