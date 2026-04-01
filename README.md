@@ -280,7 +280,7 @@ sudo grep "token" /opt/kasm/current/conf/app/agent/agent.app.config.yaml
 
 ## Acknowledgements
 
-This role was originally developed by referencing the official [kasmtech/ansible-kasm](https://github.com/kasmtech/ansible-kasm) project. It has since been independently rewritten with a different structure and feature set, but credit is due for the foundational approach.
+This role was originally developed by referencing the official [kasmtech/ansible](https://github.com/kasmtech/ansible) project. It has since been independently rewritten with a different structure and feature set, but credit is due for the foundational approach.
 
 ## License
 
