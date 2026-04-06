@@ -31,8 +31,8 @@
 - name: Update /etc/hosts
   ansible.builtin.replace:
     path: /etc/hosts
-    regexp: '^(127\.0\.1\.1\s+){{ _kasm_old_hostname }}(\s.*)?$'
-    replace: '\g<1>{{ _kasm_new_hostname }}'
+    regexp: "^(127\\.0\\.1\\.1\\s+){{ _kasm_old_hostname }}(\\s.*)?$"
+    replace: "\\g<1>{{ _kasm_new_hostname }}"
   become: true
 
 - name: Update manager hostname in database
