@@ -38,7 +38,7 @@
       {{
         hostvars[
           (groups[kasm_zone + '_web'] | default(
-            groups['zone1'] | select('match', '.*') | list
+            groups[kasm_zone] | select('match', '.*') | list
           ))[0]
         ].ansible_default_ipv4.address
       }}

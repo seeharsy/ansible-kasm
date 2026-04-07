@@ -39,6 +39,26 @@
       {%- endif %}
   tags: [install, upgrade]
 
+- name: Download Kasm installer from URL
+  ansible.builtin.get_url:
+    url: "{{ kasm_installer_url }}"
+    dest: "/tmp/{{ kasm_installer_url | basename }}"
+    mode: "0644"
+  delegate_to: localhost
+  run_once: true
+  when:
+    - kasm_installer_url | length > 0
+    - installer_file is none or installer_file | length == 0
+  tags: [install, upgrade]
+
+- name: Set installer_file to downloaded path
+  ansible.builtin.set_fact:
+    installer_file: "/tmp/{{ kasm_installer_url | basename }}"
+  when:
+    - kasm_installer_url | length > 0
+    - installer_file is none or installer_file | length == 0
+  tags: [install, upgrade]
+
 - name: Assert Kasm installer tarball is present
   ansible.builtin.assert:
     that:
@@ -46,7 +66,7 @@
       - installer_file | length > 0
     fail_msg: >-
       Kasm installer not found.
-      {% if version is defined and version | length > 0 %}No tarball matching version={{ version }} in {{ role_path }}/files/{% else %}Place a kasm_release_*.tar.gz in {{ role_path }}/files/{% endif %}
+      {% if version is defined and version | length > 0 %}No tarball matching version={{ version }} in {{ role_path }}/files/{% else %}Place a kasm_release_*.tar.gz in {{ role_path }}/files/ or set kasm_installer_url to a full download URL.{% endif %}
   tags: [install, upgrade]
 
 - name: Unarchive Kasm installer to temp directory
