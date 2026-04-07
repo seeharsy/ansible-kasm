@@ -1,10 +1,13 @@
 ---
 - name: Locate installer and image tarballs on control node
   ansible.builtin.set_fact:
-    installer_glob:        "{{ lookup('fileglob', role_path + '/files/kasm_workspaces_*.tar.gz', wantlist=True) + lookup('fileglob', role_path + '/files/kasm_release_*.tar.gz', wantlist=True) }}"
-    service_images_glob:   "{{ lookup('fileglob', role_path + '/files/kasm_workspaces_service_images*.tar.gz', wantlist=True) + lookup('fileglob', role_path + '/files/kasm_release_service_images*.tar.gz', wantlist=True) }}"
-    workspace_images_glob: "{{ lookup('fileglob', role_path + '/files/kasm_workspaces_workspace_images_*.tar.gz', wantlist=True) + lookup('fileglob', role_path + '/files/kasm_release_workspace_images_*.tar.gz', wantlist=True) }}"
-    network_plugin_glob:   "{{ lookup('fileglob', role_path + '/files/kasmweb_network_plugin_*.tar.gz', wantlist=True) }}"
+    installer_glob: "{{ lookup('fileglob', role_path + '/files/kasm_workspaces_*.tar.gz', wantlist=True) + lookup('fileglob', role_path + '/files/kasm_release_*.tar.gz',
+      wantlist=True) }}"
+    service_images_glob: "{{ lookup('fileglob', role_path + '/files/kasm_workspaces_service_images*.tar.gz', wantlist=True) + lookup('fileglob', role_path + '/files/kasm_release_service_images*.tar.gz',
+      wantlist=True) }}"
+    workspace_images_glob: "{{ lookup('fileglob', role_path + '/files/kasm_workspaces_workspace_images_*.tar.gz', wantlist=True) + lookup('fileglob', role_path +
+      '/files/kasm_release_workspace_images_*.tar.gz', wantlist=True) }}"
+    network_plugin_glob: "{{ lookup('fileglob', role_path + '/files/kasmweb_network_plugin_*.tar.gz', wantlist=True) }}"
   when: kasm_installer_file is not defined or kasm_installer_file | length == 0
   delegate_to: localhost
   tags: [install, upgrade]
@@ -32,11 +35,8 @@
 - name: Show selected installer
   ansible.builtin.debug:
     msg: >-
-      Using installer: {{ installer_file | basename }}
-      {%- if kasm_installer_file is defined and kasm_installer_file | length > 0 %} (pinned via kasm_installer_file)
-      {%- elif version is defined and version | length > 0 %} (matched version={{ version }})
-      {%- else %} (latest found in files/)
-      {%- endif %}
+      Using installer: {{ installer_file | basename }}{%- if kasm_installer_file is defined and kasm_installer_file | length > 0 %} (pinned via kasm_installer_file){%-
+      elif version is defined and version | length > 0 %} (matched version={{ version }}){%- else %} (latest found in files/){%- endif %}
   tags: [install, upgrade]
 
 - name: Download Kasm installer from URL

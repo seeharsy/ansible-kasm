@@ -28,7 +28,7 @@
 
 - name: Set web_ip and target_ip (per-host web server)
   ansible.builtin.set_fact:
-    web_ip:    "{{ ansible_default_ipv4.address }}"
+    web_ip: "{{ ansible_default_ipv4.address }}"
     target_ip: "{{ ansible_default_ipv4.address }}"
   when: not default_web
 
@@ -47,7 +47,7 @@
 
 - name: Set web_ip to local address for all-in-one
   ansible.builtin.set_fact:
-    web_ip:    "{{ ansible_default_ipv4.address }}"
+    web_ip: "{{ ansible_default_ipv4.address }}"
     target_ip: "{{ ansible_default_ipv4.address }}"
   when: kasm_all_in_one
 

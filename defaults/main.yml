@@ -51,10 +51,10 @@ vault_database_password: ""
 vault_manager_token: ""
 vault_registration_token: ""
 
-user_password:     "{{ vault_user_password }}"
-admin_password:    "{{ vault_admin_password }}"
+user_password: "{{ vault_user_password }}"
+admin_password: "{{ vault_admin_password }}"
 database_password: "{{ vault_database_password }}"
-manager_token:     "{{ vault_manager_token }}"
+manager_token: "{{ vault_manager_token }}"
 registration_token: "{{ vault_registration_token }}"
 
 # Database backup
@@ -62,17 +62,17 @@ remote_backup_dir: /srv/backup/kasm/
 retention_days: 10
 
 # Database restore
-kasm_restore_file: ""          # Path to backup tar.gz to restore from
-kasm_restore_remote: false     # true = file is already on the target host
+kasm_restore_file: "" # Path to backup tar.gz to restore from
+kasm_restore_remote: false # true = file is already on the target host
 
 # Certificates
 # Set kasm_certs_remote: false if cert files live on the Ansible control node (default).
 # Set kasm_certs_remote: true  if cert files are already present on the target host.
 kasm_certs_remote: false
-kasm_server_cert: ""   # Path to server certificate (PEM)
-kasm_server_key: ""    # Path to server private key (PEM)
-kasm_root_ca: ""       # Path to custom root CA — required for OIDC provider trust
-kasm_root_ca_dest: /srv/ca.crt  # Destination path on the target host for the root CA
+kasm_server_cert: "" # Path to server certificate (PEM)
+kasm_server_key: "" # Path to server private key (PEM)
+kasm_root_ca: "" # Path to custom root CA — required for OIDC provider trust
+kasm_root_ca_dest: /srv/ca.crt # Destination path on the target host for the root CA
 
 # Installer source
 # Place a kasm_release_*.tar.gz in files/ OR set kasm_installer_url to a full
@@ -90,9 +90,9 @@ kasm_activation_key_file: ""
 kasm_hostname: ""
 
 # Optional installer feature flags — all off by default.
-kasm_enable_lossless: false        # Enable lossless streaming option
-kasm_default_registry_url: ""      # Override Workspaces Registry URL (empty = use Kasm default)
-kasm_guac_cluster_size: ""         # Number of guacd instances on guac hosts. Empty = installer default (1 per CPU core).
-                                   # Override with an explicit count to limit or exceed the per-core default.
-kasm_no_check_ports: false         # Disable open port checks
-kasm_no_check_disk: false          # Disable disk space checks
+kasm_enable_lossless: false # Enable lossless streaming option
+kasm_default_registry_url: "" # Override Workspaces Registry URL (empty = use Kasm default)
+kasm_guac_cluster_size: "" # Number of guacd instances on guac hosts. Empty = installer default (1 per CPU core).
+# Override with an explicit count to limit or exceed the per-core default.
+kasm_no_check_ports: false # Disable open port checks
+kasm_no_check_disk: false # Disable disk space checks
