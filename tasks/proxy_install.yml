@@ -10,7 +10,7 @@
   delay: 10
   tags: install
 
-- name: Install proxy role
+- name: "Install proxy role — this may take several minutes"
   ansible.builtin.command: >
     bash {{ tempdir.path }}/kasm_release/install.sh
       --role proxy
@@ -23,10 +23,6 @@
   register: install_output
   become: true
   changed_when: install_output.rc == 0
-  retries: 20
-  delay: 10
-  until: >
-    install_output.rc == 0 or
-    ('Failed to lock apt for exclusive operation' not in (install_output.stderr | default('')) and
-     '/var/lib/dpkg/lock' not in (install_output.stderr | default('')))
+  async: 2400
+  poll: 15
   tags: install

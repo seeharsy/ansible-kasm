@@ -74,6 +74,12 @@ kasm_server_key: "" # Path to server private key (PEM)
 kasm_root_ca: "" # Path to custom root CA — required for OIDC provider trust
 kasm_root_ca_dest: /srv/ca.crt # Destination path on the target host for the root CA
 
+# Installer source
+# Place a kasm_release_*.tar.gz in files/ OR set kasm_installer_url to a full
+# download URL (Kasm S3, Nexus, internal mirror, etc.).
+# files/ takes precedence if both are provided.
+kasm_installer_url: ""
+
 # Licence
 # Filename of the activation key file placed in the role's files/ directory.
 # Leave empty to install without a licence key.

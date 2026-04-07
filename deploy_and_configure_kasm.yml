@@ -2,8 +2,11 @@
 # Single entry-point playbook for all Kasm Workspaces operations.
 #
 # Usage:
-#   Deploy (default):
+#   Deploy (default, tarball in files/):
 #     ansible-playbook deploy_and_configure_kasm.yml
+#
+#   Deploy (download from URL):
+#     ansible-playbook deploy_and_configure_kasm.yml -e kasm_installer_url=https://kasm-static-content.s3.amazonaws.com/kasm_release_1.18.0.09f70a.tar.gz
 #
 #   Upgrade (place new kasm_release_*.tar.gz in files/ first):
 #     ansible-playbook deploy_and_configure_kasm.yml -e kasm_action=upgrade

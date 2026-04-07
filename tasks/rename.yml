@@ -35,7 +35,7 @@
     replace: "\\g<1>{{ _kasm_new_hostname }}"
   become: true
 
-- name: Update manager hostname in database
+- name: Update manager hostname in database (local DB)
   community.docker.docker_container_exec:
     container: kasm_db
     command: >-
@@ -45,23 +45,41 @@
   become: true
   register: _db_update
   changed_when: "_db_update.stdout is defined and 'UPDATE 1' in _db_update.stdout"
+  when: not database_hostname
+
+- name: Warn — remote DB hostname update requires manual intervention
+  ansible.builtin.fail:
+    msg: >-
+      Remote database detected. Run the following SQL against your database manually, then re-run
+      this play with kasm_action=rename skipping the DB step by setting database_hostname=false
+      temporarily, or apply the change directly:
+        UPDATE managers SET manager_hostname = '{{ _kasm_new_hostname }}'
+        WHERE manager_hostname = '{{ _kasm_old_hostname }}';
+  when: database_hostname | default(false)
 
 - name: Stop Kasm
   ansible.builtin.command: /opt/kasm/bin/stop
   become: true
   changed_when: true
 
-- name: Replace hostname in Kasm config files
-  ansible.builtin.replace:
+- name: Stat Kasm config files
+  ansible.builtin.stat:
     path: "{{ item }}"
-    regexp: "{{ _kasm_old_hostname }}"
-    replace: "{{ _kasm_new_hostname }}"
   become: true
   loop:
     - /opt/kasm/current/conf/app/agent/agent.app.config.yaml
     - /opt/kasm/current/conf/app/api/api.app.config.yaml
     - /opt/kasm/current/conf/app/rdp_gateway/passthrough.app.config.yaml
     - /opt/kasm/current/conf/app/rdp_https_gateway/rdp_https_gateway.app.config.yaml
+  register: _config_stat
+
+- name: Replace hostname in existing Kasm config files
+  ansible.builtin.replace:
+    path: "{{ item.stat.path }}"
+    regexp: "{{ _kasm_old_hostname }}"
+    replace: "{{ _kasm_new_hostname }}"
+  become: true
+  loop: "{{ _config_stat.results | selectattr('stat.exists') | list }}"
 
 - name: Start Kasm
   ansible.builtin.command: /opt/kasm/bin/start

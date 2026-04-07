@@ -21,7 +21,7 @@
         --db-master-user {{ database_master_user }}
         --db-master-password {{ database_master_password }}
         --db-port {{ database_port }}
-        --server-zone {{ zones[0] }}
+        --server-zone {{ kasm_zone }}
         --manager-token {{ manager_token }}
         --registration-token {{ registration_token }}
         --user-password {{ user_password }}

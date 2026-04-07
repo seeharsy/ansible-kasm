@@ -101,7 +101,7 @@
       --admin-password {{ admin_password }}
       --manager-token {{ manager_token }}
       --registration-token {{ registration_token }}
-      --server-zone {{ group_names | intersect(zones) | first }}
+      --server-zone {{ kasm_zone }}
       {{ '--no-db-ssl' if not database_ssl else '' }}
       {{ '--activation-key-file ' ~ tempdir.path ~ '/kasm_activation.key' if kasm_activation_key_file | length > 0 else '' }}
       {{ '--enable-lossless' if kasm_enable_lossless else '' }}

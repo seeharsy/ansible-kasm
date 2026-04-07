@@ -12,7 +12,7 @@
       --admin-password {{ admin_password }}
       --manager-token {{ manager_token }}
       --registration-token {{ registration_token }}
-      --server-zone {{ zones[0] }}
+      --server-zone {{ kasm_zone }}
       {{ '--no-db-ssl' if not database_ssl else '' }}
       {{ '--offline-service ' ~ service_images_copy.dest if (service_images_file is not none and service_images_file | length > 0) else '' }}
       {{ '--offline-workspaces ' ~ workspace_images_copy.dest if (workspace_images_file is not none and workspace_images_file | length > 0) else '' }}
