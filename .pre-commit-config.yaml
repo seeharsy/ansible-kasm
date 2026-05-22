@@ -17,8 +17,8 @@ repos:
       - id: yamllint
 
   - repo: https://github.com/ansible/ansible-lint
-    rev: v24.12.2
+    rev: v26.4.0
     hooks:
       - id: ansible-lint
         additional_dependencies:
-          - ansible-core>=2.15,<2.18
+          - ansible-core>=2.20
