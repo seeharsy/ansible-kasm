@@ -1,4 +1,6 @@
 ---
+# Services to deploy on this host.
+# Remove or comment out services you do not need.
 kasm_services:
   - db
   - web
@@ -6,4 +8,5 @@ kasm_services:
   - guac
   # - proxy
 
+# Zone this host belongs to. Must match a group in inventory.
 kasm_zone: zone1
